@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskFlow - Task Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/script.js" defer></script>
+</head>
+
+<body>
+    <main class="container">
+        <header>
+            <h1>TaskFlow</h1>
+            <p>A simple task management application</p>
+        </header>
+
+        <section class="task-section">
+            <h2>My Tasks</h2>
+
+            <form id="task-form">
+                <input type="text" id="task-input" placeholder="Enter a new task..." required>
+                <button type="submit">Add Task</button>
+            </form>
+
+            <ul id="task-list"></ul>
+            <p id="message" role="status" aria-live="polite"></p>
+        </section>
+    </main>
+</body>
+
+</html>
