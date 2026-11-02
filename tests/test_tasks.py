@@ -45,3 +45,11 @@ def test_create_task():
     assert response.status_code == 200
     assert response.json()["title"] == "Learn GitHub Actions"
     assert response.json()["completed"] is False
+    
+
+def test_frontend_loads():
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "TaskFlow" in response.text
