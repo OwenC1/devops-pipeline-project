@@ -1,0 +1,154 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  AWS infrastructure for the TaskFlow DevOps CI/CD pipeline.
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+      - t3.micro
+      - t3.small
+    Description: EC2 instance type for running TaskFlow.
+
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Description: Latest Amazon Linux 2023 AMI
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC where TaskFlow will be deployed
+
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Public subnet for the TaskFlow EC2 instance
+
+  GitHubOIDCProviderArn:
+    Type: String
+    Description: ARN of the GitHub Actions OIDC provider
+
+
+Resources:
+  TaskFlowSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP access to the TaskFlow application
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0
+          Description: Allow public access to TaskFlow
+
+  TaskFlowEC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: taskflow-ec2-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+
+  TaskFlowInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref TaskFlowEC2Role
+
+  TaskFlowEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      SubnetId: !Ref SubnetId
+      IamInstanceProfile: !Ref TaskFlowInstanceProfile
+      SecurityGroupIds:
+        - !Ref TaskFlowSecurityGroup
+
+      Tags:
+        - Key: Name
+          Value: taskflow-devops-server
+
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -eux
+
+          dnf update -y
+          dnf install -y docker
+
+          systemctl enable docker
+          systemctl start docker
+
+          usermod -aG docker ec2-user
+
+  GitHubActionsDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: taskflow-github-actions-deploy-role
+
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProviderArn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: repo:OwenC1/devops-pipeline-project:ref:refs/heads/main
+
+      Policies:
+        - PolicyName: TaskFlowECRPushPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ECRAuthentication
+                Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: "*"
+
+              - Sid: PushTaskFlowImages
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource: arn:aws:ecr:eu-west-1:880757820656:repository/taskflow-api
+
+        - PolicyName: TaskFlowSSMDeployPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: SendDeploymentCommand
+                Effect: Allow
+                Action:
+                  - ssm:SendCommand
+                Resource:
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${TaskFlowEC2Instance}
+                  - !Sub arn:aws:ssm:${AWS::Region}::document/AWS-RunShellScript
+
+              - Sid: ReadDeploymentResults
+                Effect: Allow
+                Action:
+                  - ssm:GetCommandInvocation
+                Resource: "*"
+
+              - Sid: DiscoverTaskFlowInstance
+                Effect: Allow
+                Action:
+                  - cloudformation:DescribeStackResource
+                Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/taskflow-devops-stack/*
