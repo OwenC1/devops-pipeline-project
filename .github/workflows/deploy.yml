@@ -118,7 +118,7 @@ jobs:
                 "docker stop taskflow || true",
                 "docker rm taskflow || true",
                 ("docker run -d --name taskflow --restart unless-stopped -p 8000:8000 " + $image),
-                "for i in $(seq 1 15); do if curl -fsS http://localhost:8000/health; then exit 0; fi; sleep 2; done; echo 'TaskFlow health check failed'; exit 1"
+                "for i in $(seq 1 15); do if curl -fsS http://localhost:8000/health; then exit 0; fi; sleep 2; done; exit 1"
               ]}')" \
             --query "Command.CommandId" \
             --output text)
