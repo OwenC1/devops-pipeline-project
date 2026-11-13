@@ -106,7 +106,7 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub: repo:OwenC1/devops-pipeline-project:ref:refs/heads/main
+                token.actions.githubusercontent.com:sub: repo:OwenC1@128686315/devops-pipeline-project@1378804930:ref:refs/heads/main
 
       Policies:
         - PolicyName: TaskFlowECRPushPolicy
