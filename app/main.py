@@ -2,9 +2,8 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 from prometheus_fastapi_instrumentator import Instrumentator
-
+from pydantic import BaseModel
 
 app = FastAPI(title="DevOps Task API")
 # Collect HTTP metrics and expose them for Prometheus
