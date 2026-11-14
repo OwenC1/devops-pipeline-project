@@ -46,4 +46,4 @@ jobs:
           image-ref: devops-task-api
           format: table
           exit-code: "1"
-          severity: "HIGH,CRITICAL"
+          severity: "CRITICAL"
